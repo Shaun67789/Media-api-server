@@ -7,7 +7,7 @@ def download_media(url, media_type):
     uid = str(uuid.uuid4())
     out = f"{DOWNLOAD_DIR}/{uid}.%(ext)s"
 
-    base_cmd = [
+    cmd = [
         "yt-dlp",
         "--config-location", "yt.conf",
         "--user-agent", "Mozilla/5.0",
@@ -15,16 +15,16 @@ def download_media(url, media_type):
     ]
 
     if media_type == "mp3":
-        base_cmd += ["-x", "--audio-format", "mp3"]
+        cmd += ["-x", "--audio-format", "mp3"]
     else:
-        base_cmd += ["-f", "bv*+ba/best"]
+        cmd += ["-f", "bv*+ba/best"]
 
-    base_cmd.append(url)
+    cmd.append(url)
 
-    process = subprocess.run(base_cmd, capture_output=True, text=True)
+    p = subprocess.run(cmd, capture_output=True, text=True)
 
-    if process.returncode != 0:
-        raise Exception(process.stderr)
+    if p.returncode != 0:
+        raise Exception(p.stderr)
 
     files = os.listdir(DOWNLOAD_DIR)
     latest = max([os.path.join(DOWNLOAD_DIR, f) for f in files], key=os.path.getctime)
