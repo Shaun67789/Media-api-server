@@ -1,19 +1,13 @@
-import os, time, shutil, threading
+import os, time, shutil
 
 DOWNLOAD_DIR = "downloads"
+MAX_AGE = 20 * 60
 
-def cleaner():
+def cleanup_loop():
     while True:
-        time.sleep(1200)  # 20 minutes
+        now = time.time()
         for f in os.listdir(DOWNLOAD_DIR):
             path = os.path.join(DOWNLOAD_DIR, f)
-            try:
-                if os.path.isfile(path):
-                    os.remove(path)
-                else:
-                    shutil.rmtree(path)
-            except:
-                pass
-
-def start_cleaner():
-    threading.Thread(target=cleaner, daemon=True).start()
+            if os.path.isfile(path) and now - os.path.getmtime(path) > MAX_AGE:
+                os.remove(path)
+        time.sleep(300)
