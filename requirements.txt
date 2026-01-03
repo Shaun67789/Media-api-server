@@ -4,3 +4,4 @@ yt-dlp
 instaloader
 aiofiles
 python-multipart
+ffmpeg-python
