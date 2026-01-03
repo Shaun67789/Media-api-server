@@ -1,53 +1,36 @@
-import os
-from yt_dlp import YoutubeDL
+import os, subprocess, uuid
 
 DOWNLOAD_DIR = "downloads"
-MAX_SIZE_MB = 400
-
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-
-def safe_filename(name):
-    return "".join(c if c.isalnum() or c in "._- " else "_" for c in name)
-
-def file_ok(path):
-    return os.path.exists(path) and os.path.getsize(path) <= MAX_SIZE_MB * 1024 * 1024
+MAX_SIZE = 400 * 1024 * 1024
 
 def download_media(url, media_type):
-    ydl_opts = {
-        "outtmpl": f"{DOWNLOAD_DIR}/%(title)s.%(ext)s",
-        "noplaylist": True,
-        "quiet": True,
-        "merge_output_format": "mp4",
-        "cookiefile": "cookies.txt"
-    }
+    uid = str(uuid.uuid4())
+    out = f"{DOWNLOAD_DIR}/{uid}.%(ext)s"
+
+    base_cmd = [
+        "yt-dlp",
+        "--config-location", "yt.conf",
+        "--user-agent", "Mozilla/5.0",
+        "-o", out
+    ]
 
     if media_type == "mp3":
-        ydl_opts["format"] = "bestaudio/best"
-        ydl_opts["postprocessors"] = [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "mp3",
-            "preferredquality": "192",
-        }]
+        base_cmd += ["-x", "--audio-format", "mp3"]
     else:
-        ydl_opts["format"] = "bestvideo+bestaudio/best"
+        base_cmd += ["-f", "bv*+ba/best"]
 
-    with YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        file = ydl.prepare_filename(info)
+    base_cmd.append(url)
 
-    if media_type == "mp3":
-        file = os.path.splitext(file)[0] + ".mp3"
+    process = subprocess.run(base_cmd, capture_output=True, text=True)
 
-    file = f"{DOWNLOAD_DIR}/{safe_filename(os.path.basename(file))}"
+    if process.returncode != 0:
+        raise Exception(process.stderr)
 
-    if not file_ok(file):
-        if os.path.exists(file): os.remove(file)
+    files = os.listdir(DOWNLOAD_DIR)
+    latest = max([os.path.join(DOWNLOAD_DIR, f) for f in files], key=os.path.getctime)
+
+    if os.path.getsize(latest) > MAX_SIZE:
+        os.remove(latest)
         raise Exception("File exceeds 400MB limit")
 
-    return {
-        "title": info.get("title"),
-        "channel": info.get("uploader") or info.get("creator"),
-        "duration": info.get("duration"),
-        "file": file,
-        "size_mb": round(os.path.getsize(file) / (1024 * 1024), 2)
-    }
+    return latest
