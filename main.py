@@ -1,32 +1,23 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI
 from downloader import download_media
-from cleanup import start_cleaner
-import os
+import os, threading
+from cleanup import cleanup_loop
 
 app = FastAPI()
 
-start_cleaner()
+os.makedirs("downloads", exist_ok=True)
+
+threading.Thread(target=cleanup_loop, daemon=True).start()
 
 @app.get("/{platform}")
-async def api_download(platform: str, url: str, type: str = "mp4"):
+def download(platform: str, url: str, type: str = "mp4"):
     try:
-        info = download_media(url, type.lower())
+        file_path = download_media(url, type)
         return {
-            "status": "success",
             "platform": platform,
-            "title": info["title"],
-            "channel": info["channel"],
-            "duration": info["duration"],
-            "size_mb": info["size_mb"],
-            "download_url": f"/download/{os.path.basename(info['file'])}"
+            "status": "success",
+            "file": os.path.basename(file_path),
+            "size_mb": round(os.path.getsize(file_path)/1024/1024, 2)
         }
     except Exception as e:
-        raise HTTPException(500, str(e))
-
-@app.get("/download/{file}")
-def get_file(file: str):
-    path = f"downloads/{file}"
-    if not os.path.exists(path):
-        raise HTTPException(404, "File not found")
-    return FileResponse(path, filename=file)
+        return {"status": "error", "message": str(e)}
